@@ -4,7 +4,15 @@ import StatCard from "./components/StatCard";
 import RangeFilter from "./components/RangeFilter";
 import TrendChart from "./components/TrendChart";
 import RequestLog from "./components/RequestLog";
-import { fetchUsage, fetchAnalytics, fetchRequests, UsageResponse, AnalyticsResponse, RequestEntry } from "./api";
+import {
+  fetchUsage,
+  fetchAnalytics,
+  fetchRequests,
+  UsageResponse,
+  AnalyticsResponse,
+  RequestEntry,
+  RequestFilters,
+} from "./api";
 import "./App.css";
 
 const CLIENTS = [
@@ -27,6 +35,7 @@ export default function App() {
 
   const [requests, setRequests] = useState<RequestEntry[]>([]);
   const [requestsError, setRequestsError] = useState<string | null>(null);
+  const [requestFilters, setRequestFilters] = useState<RequestFilters>({});
 
   const loadUsage = useCallback(async () => {
     try {
@@ -53,13 +62,13 @@ export default function App() {
 
   const loadRequests = useCallback(async () => {
     try {
-      const data = await fetchRequests(clientId, 50);
+      const data = await fetchRequests(clientId, 50, requestFilters);
       setRequests(data);
       setRequestsError(null);
     } catch (err) {
       setRequestsError((err as Error).message);
     }
-  }, [clientId]);
+  }, [clientId, requestFilters]);
 
   useEffect(() => {
     loadUsage();
@@ -153,7 +162,13 @@ export default function App() {
               Refresh
             </button>
           </div>
-          <RequestLog requests={requests} loading={requests.length === 0} error={requestsError} />
+          <RequestLog
+            requests={requests}
+            loading={requests.length === 0}
+            error={requestsError}
+            filters={requestFilters}
+            onFiltersChange={setRequestFilters}
+          />
         </section>
       </main>
     </div>

@@ -112,12 +112,6 @@
 }
 
 @media (max-width: 640px) {
-  .app__stats {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .app__header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
-  }
+  .app__stats { grid-template-columns: repeat(2, 1fr); }
+  .app__header { flex-direction: column; align-items: flex-start; gap: 16px; }
 }

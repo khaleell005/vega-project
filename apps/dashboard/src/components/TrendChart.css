@@ -28,7 +28,45 @@
   padding: 2px 0;
 }
 
+.trend-chart__tooltip-row--allowed strong {
+  color: #6fd9a1;
+}
+
+.trend-chart__tooltip-row--denied strong {
+  color: #f09080;
+}
+
 .trend-chart__tooltip-row strong {
   font-family: var(--font-mono);
   font-weight: 500;
+}
+
+.trend-chart__legend {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  padding-top: 4px;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.trend-chart__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.trend-chart__legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.trend-chart__legend-dot--allowed {
+  background: #2f9e6b;
+}
+
+.trend-chart__legend-dot--denied {
+  background: #c4432b;
 }

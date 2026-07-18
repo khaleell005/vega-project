@@ -6,6 +6,16 @@ datasource db {
   provider = "postgresql"
 }
 
+model ClientConfig {
+  id              String   @id @map("client_id")
+  limitPerMinute  Int      @map("limit_per_minute")
+  displayName     String?  @map("display_name")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@map("client_configs")
+}
+
 model Request {
   id              BigInt   @id @default(autoincrement()) @db.BigInt
   clientId        String   @map("client_id")

@@ -20,9 +20,5 @@
   color: var(--ink);
 }
 
-.stat-card--safe .stat-card__value {
-  color: var(--safe);
-}
-.stat-card--danger .stat-card__value {
-  color: var(--danger);
-}
+.stat-card--safe .stat-card__value { color: var(--safe); }
+.stat-card--danger .stat-card__value { color: var(--danger); }

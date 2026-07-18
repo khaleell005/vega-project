@@ -28,18 +28,9 @@
   border-radius: 999px;
 }
 
-.quota-gauge__status--safe {
-  color: var(--safe);
-  background: var(--safe-soft);
-}
-.quota-gauge__status--warn {
-  color: var(--warn);
-  background: var(--warn-soft);
-}
-.quota-gauge__status--danger {
-  color: var(--danger);
-  background: var(--danger-soft);
-}
+.quota-gauge__status--safe { color: var(--safe); background: var(--safe-soft); }
+.quota-gauge__status--warn { color: var(--warn); background: var(--warn-soft); }
+.quota-gauge__status--danger { color: var(--danger); background: var(--danger-soft); }
 
 .quota-gauge__track {
   position: relative;
@@ -58,20 +49,11 @@
   transition: width 400ms ease, background-color 400ms ease;
 }
 
-.quota-gauge__fill--safe {
-  background: linear-gradient(90deg, #2f9e6b, #3fb37d);
-}
-.quota-gauge__fill--warn {
-  background: linear-gradient(90deg, #d98e04, #e6a323);
-}
-.quota-gauge__fill--danger {
-  background: linear-gradient(90deg, #c4432b, #d65a41);
-}
+.quota-gauge__fill--safe { background: linear-gradient(90deg, #2f9e6b, #3fb37d); }
+.quota-gauge__fill--warn { background: linear-gradient(90deg, #d98e04, #e6a323); }
+.quota-gauge__fill--danger { background: linear-gradient(90deg, #c4432b, #d65a41); }
 
-.quota-gauge__ticks {
-  position: absolute;
-  inset: 0;
-}
+.quota-gauge__ticks { position: absolute; inset: 0; }
 
 .quota-gauge__tick {
   position: absolute;
@@ -96,10 +78,7 @@
   letter-spacing: -0.01em;
 }
 
-.quota-gauge__slash {
-  color: var(--ink-faint);
-  margin: 0 4px;
-}
+.quota-gauge__slash { color: var(--ink-faint); margin: 0 4px; }
 
 .quota-gauge__label {
   font-size: 13px;

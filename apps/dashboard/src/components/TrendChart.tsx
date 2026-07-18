@@ -6,6 +6,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  Legend,
 } from "recharts";
 import type { TooltipProps } from "recharts";
 import type { TrendPoint } from "../api";
@@ -18,7 +19,7 @@ function formatDateLabel(dateStr: string): string {
 
 interface CustomTooltipProps extends TooltipProps<number, string> {
   active?: boolean;
-  payload?: Array<{ payload: TrendPoint }>;
+  payload?: Array<{ dataKey: string; value: number; payload: TrendPoint }>;
   label?: string;
 }
 
@@ -29,13 +30,36 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
     <div className="trend-chart__tooltip">
       <div className="trend-chart__tooltip-date">{formatDateLabel(label)}</div>
       <div className="trend-chart__tooltip-row">
-        <span>Requests</span>
+        <span>Total</span>
         <strong>{point.requestCount}</strong>
+      </div>
+      <div className="trend-chart__tooltip-row trend-chart__tooltip-row--allowed">
+        <span>Allowed</span>
+        <strong>{point.allowedCount}</strong>
+      </div>
+      <div className="trend-chart__tooltip-row trend-chart__tooltip-row--denied">
+        <span>Denied</span>
+        <strong>{point.deniedCount}</strong>
       </div>
       <div className="trend-chart__tooltip-row">
         <span>Avg response</span>
         <strong>{point.avgResponseTimeMs}ms</strong>
       </div>
+    </div>
+  );
+}
+
+function CustomLegend() {
+  return (
+    <div className="trend-chart__legend">
+      <span className="trend-chart__legend-item">
+        <span className="trend-chart__legend-dot trend-chart__legend-dot--allowed" />
+        Allowed
+      </span>
+      <span className="trend-chart__legend-item">
+        <span className="trend-chart__legend-dot trend-chart__legend-dot--denied" />
+        Denied
+      </span>
     </div>
   );
 }
@@ -47,12 +71,16 @@ interface TrendChartProps {
 export default function TrendChart({ data }: TrendChartProps) {
   return (
     <div className="trend-chart">
-      <ResponsiveContainer width="100%" height={220}>
+      <ResponsiveContainer width="100%" height={240}>
         <AreaChart data={data} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
           <defs>
-            <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#3a4f91" stopOpacity={0.28} />
-              <stop offset="100%" stopColor="#3a4f91" stopOpacity={0.02} />
+            <linearGradient id="trendFillAllowed" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#2f9e6b" stopOpacity={0.28} />
+              <stop offset="100%" stopColor="#2f9e6b" stopOpacity={0.02} />
+            </linearGradient>
+            <linearGradient id="trendFillDenied" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#c4432b" stopOpacity={0.22} />
+              <stop offset="100%" stopColor="#c4432b" stopOpacity={0.02} />
             </linearGradient>
           </defs>
           <CartesianGrid stroke="#e2e5ea" vertical={false} />
@@ -71,12 +99,24 @@ export default function TrendChart({ data }: TrendChartProps) {
             width={36}
           />
           <Tooltip content={<CustomTooltip />} />
+          <Legend content={<CustomLegend />} />
           <Area
             type="monotone"
-            dataKey="requestCount"
-            stroke="#3a4f91"
+            dataKey="allowedCount"
+            stackId="requests"
+            stroke="#2f9e6b"
             strokeWidth={2}
-            fill="url(#trendFill)"
+            fill="url(#trendFillAllowed)"
+            name="Allowed"
+          />
+          <Area
+            type="monotone"
+            dataKey="deniedCount"
+            stackId="requests"
+            stroke="#c4432b"
+            strokeWidth={2}
+            fill="url(#trendFillDenied)"
+            name="Denied"
           />
         </AreaChart>
       </ResponsiveContainer>

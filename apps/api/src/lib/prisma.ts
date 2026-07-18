@@ -1,13 +1,5 @@
 /**
- * prisma.ts — Prisma client singleton.
- *
- * Creates a single PrismaClient instance that connects to PostgreSQL
- * using the @prisma/adapter-pg driver adapter (the newer Prisma approach
- * that uses the pg driver directly instead of Prisma's built-in engine).
- *
- * Connection string comes from the DATABASE_URL environment variable,
- * which is set in docker-compose.yml for container mode, or in .env
- * for local development.
+ * prisma.ts — Prisma client singleton using @prisma/adapter-pg driver adapter.
  */
 
 import dotenv from "dotenv";

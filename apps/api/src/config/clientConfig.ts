@@ -1,33 +1,153 @@
 /**
- * clientConfig.ts — Per-client rate-limit configuration.
+ * clientConfig.ts — DB-backed per-client rate-limit configuration.
  *
- * Each client is identified by a string ID and has a `limitPerMinute`
- * that defines how many requests they're allowed per 60-second window.
+ * Limits are stored in the `client_configs` PostgreSQL table.
+ * Hot path reads from an in-memory Map (refreshed every 60s) so
+ * getClientLimit() is synchronous with zero I/O.
  *
- * Unknown clients (not in the map) fall back to DEFAULT_LIMIT_PER_MINUTE (60).
- * This prevents unregistered clients from overwhelming the system while still
- * allowing them through at a conservative rate.
- *
- * NOTE: This is currently hardcoded. In a production system, this would
- * be backed by a database or config service to allow runtime updates
- * without redeployment.
+ * Unknown clients fall back to DEFAULT_LIMIT_PER_MINUTE (60).
  */
 
-const CLIENT_LIMITS: Record<string, { limitPerMinute: number }> = {
-  "client-a": { limitPerMinute: 100 },
-  "client-b": { limitPerMinute: 5000 },
-};
+import prisma from "../lib/prisma";
+import { cacheGet, cacheSet, cacheInvalidate } from "../lib/cache";
 
-/** Default limit for clients not explicitly configured. */
-const DEFAULT_LIMIT_PER_MINUTE = 60;
+export const DEFAULT_LIMIT_PER_MINUTE = 60;
 
-/**
- * Look up a client's per-minute limit.
- * Returns the configured limit or the default (60) for unknown clients.
- */
-export function getClientLimit(clientId: string): number {
-  const config = CLIENT_LIMITS[clientId];
-  return config ? config.limitPerMinute : DEFAULT_LIMIT_PER_MINUTE;
+const MEMORY_CACHE_TTL_MS = 60_000;
+const REDIS_CACHE_TTL = 120;
+
+interface ClientEntry {
+  limitPerMinute: number;
+  displayName: string | null;
 }
 
-export { CLIENT_LIMITS, DEFAULT_LIMIT_PER_MINUTE };
+const memoryCache = new Map<string, ClientEntry>();
+let lastRefreshAt = 0;
+
+/** Reload in-memory cache from Postgres. */
+export async function refreshClientCache(): Promise<void> {
+  try {
+    const rows = await prisma.clientConfig.findMany();
+    memoryCache.clear();
+    for (const row of rows) {
+      memoryCache.set(row.id, {
+        limitPerMinute: row.limitPerMinute,
+        displayName: row.displayName,
+      });
+    }
+    lastRefreshAt = Date.now();
+  } catch (err) {
+    const error = err as Error;
+    console.error("[clientConfig] failed to refresh cache:", error.message);
+  }
+}
+
+/**
+ * Synchronous limit lookup from in-memory cache.
+ * Triggers async background refresh if cache is stale.
+ */
+export function getClientLimit(clientId: string): number {
+  if (Date.now() - lastRefreshAt > MEMORY_CACHE_TTL_MS) {
+    refreshClientCache().catch(() => {});
+  }
+  const entry = memoryCache.get(clientId);
+  return entry ? entry.limitPerMinute : DEFAULT_LIMIT_PER_MINUTE;
+}
+
+/** Synchronous display-name lookup from in-memory cache. */
+export function getClientDisplayName(clientId: string): string | null {
+  return memoryCache.get(clientId)?.displayName ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Admin CRUD (async, uses Prisma + Redis cache)
+// ---------------------------------------------------------------------------
+
+export interface ClientConfigInput {
+  id: string;
+  limitPerMinute: number;
+  displayName?: string;
+}
+
+export interface ClientConfigOutput {
+  id: string;
+  limitPerMinute: number;
+  displayName: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** List all clients (Redis-cached 30s). */
+export async function listClients(): Promise<ClientConfigOutput[]> {
+  const cacheKey = "cache:client-configs:all";
+  const cached = await cacheGet<ClientConfigOutput[]>(cacheKey);
+  if (cached) return cached;
+
+  const rows = await prisma.clientConfig.findMany({ orderBy: { id: "asc" } });
+  const result = rows.map((r: { id: string; limitPerMinute: number; displayName: string | null; createdAt: Date; updatedAt: Date }) => ({
+    id: r.id,
+    limitPerMinute: r.limitPerMinute,
+    displayName: r.displayName,
+    createdAt: r.createdAt.toISOString(),
+    updatedAt: r.updatedAt.toISOString(),
+  }));
+
+  await cacheSet(cacheKey, result, REDIS_CACHE_TTL);
+  return result;
+}
+
+/** Get a single client by ID. */
+export async function getClient(id: string): Promise<ClientConfigOutput | null> {
+  const row = await prisma.clientConfig.findUnique({ where: { id } });
+  if (!row) return null;
+  return {
+    id: row.id,
+    limitPerMinute: row.limitPerMinute,
+    displayName: row.displayName,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+/** Create or update a client config. */
+export async function upsertClient(input: ClientConfigInput): Promise<ClientConfigOutput> {
+  const row = await prisma.clientConfig.upsert({
+    where: { id: input.id },
+    update: {
+      limitPerMinute: input.limitPerMinute,
+      displayName: input.displayName ?? null,
+    },
+    create: {
+      id: input.id,
+      limitPerMinute: input.limitPerMinute,
+      displayName: input.displayName ?? null,
+    },
+  });
+
+  await Promise.all([
+    cacheInvalidate("cache:client-configs:*"),
+    refreshClientCache(),
+  ]);
+
+  return {
+    id: row.id,
+    limitPerMinute: row.limitPerMinute,
+    displayName: row.displayName,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+/** Delete a client config. Returns false if not found. */
+export async function deleteClient(id: string): Promise<boolean> {
+  try {
+    await prisma.clientConfig.delete({ where: { id } });
+    await Promise.all([
+      cacheInvalidate("cache:client-configs:*"),
+      refreshClientCache(),
+    ]);
+    return true;
+  } catch {
+    return false;
+  }
+}

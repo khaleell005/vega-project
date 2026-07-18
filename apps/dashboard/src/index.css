@@ -1,5 +1,4 @@
 :root {
-  /* ---- Color tokens ---- */
   --bg: #f5f6f8;
   --surface: #ffffff;
   --surface-sunken: #eef0f3;
@@ -19,7 +18,6 @@
   --danger: #c4432b;
   --danger-soft: #fbe9e5;
 
-  /* ---- Type tokens ---- */
   --font-display: "Space Grotesk", "Segoe UI", sans-serif;
   --font-body: "IBM Plex Sans", "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", "SF Mono", monospace;
@@ -28,15 +26,9 @@
   --radius-sm: 6px;
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
-html,
-body,
-#root {
-  height: 100%;
-}
+html, body, #root { height: 100%; }
 
 body {
   margin: 0;
@@ -46,9 +38,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-button {
-  font-family: inherit;
-}
+button { font-family: inherit; }
 
 button:focus-visible,
 select:focus-visible {

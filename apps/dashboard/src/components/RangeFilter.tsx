@@ -23,9 +23,7 @@ export default function RangeFilter({ value, onChange }: RangeFilterProps) {
         <button
           key={opt.value}
           type="button"
-          className={`range-filter__option${
-            value === opt.value ? " range-filter__option--active" : ""
-          }`}
+          className={`range-filter__option${value === opt.value ? " range-filter__option--active" : ""}`}
           onClick={() => onChange(opt.value)}
           aria-pressed={value === opt.value}
         >

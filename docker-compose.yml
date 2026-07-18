@@ -1,61 +1,21 @@
-# =============================================================================
 # docker-compose.yml — Full application stack
-# =============================================================================
 #
-# Brings up the entire application — Redis, Postgres, the rate limiter API,
-# dashboard, and test client — with one command:
+# Usage:  docker compose up --build
 #
-#   docker compose up --build
-#
-# This is the primary way to run the project. No local Node.js, Redis, or
-# Postgres installation is needed — Docker handles everything.
-#
-# Services:
-#   redis       — Shared counter store + cache layer (port 6379)
-#   postgres    — Durable request log + analytics (port 5432)
-#   app         — The rate limiter API, TypeScript (port 3000)
-#   dashboard   — React dashboard, TypeScript + Vite (port 5173)
-#   test-client — Standalone test page for exercising /check (port 8080)
-#
-# Port conflicts:
-#   If you already have Redis or Postgres running locally, the default ports
-#   (6379, 5432) will conflict. Create a .env file NEXT to this file (NOT the
-#   app's .env) to remap host ports:
-#
-#     POSTGRES_HOST_PORT=5433
-#     REDIS_HOST_PORT=6380
-#     APP_HOST_PORT=3000
-#     DASHBOARD_HOST_PORT=5173
-#     TEST_CLIENT_HOST_PORT=8080
-#
-#   Then run `docker compose up --build` again. See README.md for the full
-#   walkthrough of this scenario.
-# =============================================================================
+# Remap host ports via .env next to this file:
+#   POSTGRES_HOST_PORT=5433  REDIS_HOST_PORT=6380  APP_HOST_PORT=3000 ...
 
 services:
-  # ---------------------------------------------------------------------------
-  # Redis — atomic counter store + cache layer
-  # ---------------------------------------------------------------------------
-  # Stores rate-limit counters (via Lua script) and analytics/usage caches.
-  # No persistent volume — data loss on restart is acceptable for a rate
-  # limiter (counters reset to 0, which is the correct behavior).
   redis:
     image: redis:7
     ports:
       - "${REDIS_HOST_PORT:-6379}:6379"
     healthcheck:
-      # Redis PING returns "PONG" — simple and fast liveness check.
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
 
-  # ---------------------------------------------------------------------------
-  # PostgreSQL — durable request log + analytics
-  # ---------------------------------------------------------------------------
-  # Stores every rate-limit check (allowed + denied) for analytics and billing.
-  # Uses a named volume (rate-limiter-pgdata) for data persistence across
-  # restarts — unlike Redis, losing request history is NOT acceptable.
   postgres:
     image: postgres:16
     environment:
@@ -64,7 +24,6 @@ services:
     ports:
       - "${POSTGRES_HOST_PORT:-5432}:5432"
     healthcheck:
-      # pg_isready checks if Postgres is accepting connections.
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 3s
@@ -72,18 +31,6 @@ services:
     volumes:
       - rate-limiter-pgdata:/var/lib/postgresql/data
 
-  # ---------------------------------------------------------------------------
-  # App — the rate limiter API (TypeScript)
-  # ---------------------------------------------------------------------------
-  # Builds from apps/api/Dockerfile. The app starts by running
-  # `prisma db push` (auto-syncs schema), then launches the API via tsx.
-  #
-  # Environment variables configure the Redis and Postgres connections.
-  # The DATABASE_URL is the full connection string used by Prisma.
-  #
-  # depends_on with service_healthy ensures the app doesn't start until
-  # both Redis and Postgres are fully ready — preventing connection errors
-  # on startup.
   app:
     build: ./apps/api
     ports:
@@ -104,13 +51,6 @@ services:
       postgres:
         condition: service_healthy
 
-  # ---------------------------------------------------------------------------
-  # Dashboard — React SPA served by nginx
-  # ---------------------------------------------------------------------------
-  # Built from apps/dashboard/. VITE_API_BASE is injected at build time — it tells the browser where
-  # to find the API. This MUST be the host-facing URL (e.g. localhost:3000),
-  # NOT the Docker internal URL (app:3000), because the browser runs outside
-  # the Docker network.
   dashboard:
     build:
       context: ./apps/dashboard
@@ -128,6 +68,5 @@ services:
     depends_on:
       - app
 
-# Named volume for Postgres data persistence.
 volumes:
   rate-limiter-pgdata:

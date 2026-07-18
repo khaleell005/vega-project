@@ -8,12 +8,7 @@ interface QuotaGaugeProps {
 
 type StatusKey = "danger" | "warn" | "safe";
 
-interface Status {
-  key: StatusKey;
-  label: string;
-}
-
-function getStatus(fraction: number): Status {
+function getStatus(fraction: number): { key: StatusKey; label: string } {
   if (fraction >= 0.9) return { key: "danger", label: "Near limit" };
   if (fraction >= 0.7) return { key: "warn", label: "Elevated" };
   return { key: "safe", label: "Healthy" };

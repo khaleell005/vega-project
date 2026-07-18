@@ -1,22 +1,10 @@
 /**
  * server.ts — Express API entry point.
  *
- * Exposes four endpoints:
- *   POST /check          — the hot path: is this request allowed?
- *   GET  /usage/:id      — current window stats (read-only, for dashboard)
- *   GET  /analytics/:id  — historical summary + daily trend (for dashboard)
- *   GET  /health          — liveness probe
- *
- * Design notes:
- *   - The /check handler uses process.hrtime.bigint() for nanosecond-precision
- *     latency measurement, which is exposed via the X-Response-Time-Ms header.
- *   - logRequest() is called fire-and-forget (no await) so the database write
- *     never blocks the response. If the DB is down, the user still gets a fast
- *     answer — logging failures are silently swallowed.
- *   - Both allowed AND denied requests are logged, ensuring complete billing
- *     and analytics data.
- *   - Graceful shutdown drains in-flight requests, then disconnects Prisma and
- *     Redis before exiting (important for container orchestrated restarts).
+ * Hot path:    POST /check
+ * Dashboard:   GET /usage/:id, GET /analytics/:id, GET /requests/:id
+ * Admin:       CRUD /clients
+ * Health:      GET /health
  */
 
 import dotenv from "dotenv";
@@ -27,83 +15,53 @@ import http from "http";
 import { checkLimit, getCurrentUsage } from "./services/rateLimiter";
 import { logRequest } from "./services/requestLogger";
 import { getClientAnalytics, isValidRange, ALLOWED_RANGES } from "./services/analytics";
+import {
+  refreshClientCache,
+  listClients,
+  getClient,
+  upsertClient,
+  deleteClient,
+} from "./config/clientConfig";
 import prisma from "./lib/prisma";
 import redis from "./lib/redis";
 
 const app = express();
 app.use(express.json());
 
-/**
- * CORS middleware — allows the dashboard (served on a different origin/port)
- * to call the API. In production, tighten the origin to the actual dashboard URL.
- */
+// CORS — tighten origin in production.
 app.use((req: Request, res: Response, next: () => void) => {
   res.set("Access-Control-Allow-Origin", "*");
-  res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.set("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
 });
 
-/**
- * POST /check — the core rate-limit check.
- *
- * Request body:  { clientId: string }
- * Response:      { allowed, clientId, count, limit, source }
- *
- * The "source" field tells you whether the check was backed by Redis ("redis"),
- * a local in-memory fallback ("local-fallback"), or a cached result.
- * Both allowed (200) and denied (429) requests are logged to Postgres for
- * analytics and billing — logging is fire-and-forget so it never adds latency.
- */
+// ---------------------------------------------------------------------------
+// POST /check — core rate-limit check (hot path)
+// ---------------------------------------------------------------------------
+
 app.post("/check", async (req: Request, res: Response) => {
   const { clientId } = req.body;
+  if (!clientId) return res.status(400).json({ error: "clientId is required" });
 
-  if (!clientId) {
-    return res.status(400).json({ error: "clientId is required" });
-  }
-
-  // High-precision start time — hrtime.bigint() gives nanosecond resolution.
   const start = process.hrtime.bigint();
 
   try {
     const result = await checkLimit(clientId);
     const elapsedMs = Number(process.hrtime.bigint() - start) / 1e6;
-
-    // Expose latency as a response header for monitoring/debugging.
     res.set("X-Response-Time-Ms", elapsedMs.toFixed(2));
 
-    if (!result.allowed) {
-      // Denied requests are logged too — this is critical for billing
-      // and analytics accuracy. The log is fire-and-forget (no await)
-      // so it never blocks the 429 response.
-      logRequest({
-        clientId,
-        status: "denied",
-        responseTimeMs: elapsedMs,
-        source: result.source,
-      });
-
-      return res.status(429).json({
-        allowed: false,
-        clientId,
-        count: result.count,
-        limit: result.limit,
-        source: result.source,
-      });
-    }
-
-    // Allowed — log for analytics/billing. Fire-and-forget: if the DB
-    // write fails, the user still gets their fast response.
     logRequest({
       clientId,
-      status: "allowed",
+      status: result.allowed ? "allowed" : "denied",
       responseTimeMs: elapsedMs,
       source: result.source,
     });
 
-    return res.status(200).json({
-      allowed: true,
+    const status = result.allowed ? 200 : 429;
+    return res.status(status).json({
+      allowed: result.allowed,
       clientId,
       count: result.count,
       limit: result.limit,
@@ -115,16 +73,12 @@ app.post("/check", async (req: Request, res: Response) => {
   }
 });
 
-/**
- * GET /usage/:clientId — read-only snapshot of the current rate-limit window.
- *
- * Returns { count, limit, windowSecondsRemaining } for the dashboard's
- * quota gauge. Uses a 5-second Redis cache to avoid hammering Redis
- * on every dashboard poll (which runs every 4 seconds).
- */
+// ---------------------------------------------------------------------------
+// GET /usage/:clientId — current window snapshot (dashboard)
+// ---------------------------------------------------------------------------
+
 app.get("/usage/:clientId", async (req: Request, res: Response) => {
   const clientId = req.params.clientId as string;
-
   try {
     const usage = await getCurrentUsage(clientId);
     return res.status(200).json({ clientId, ...usage });
@@ -134,14 +88,10 @@ app.get("/usage/:clientId", async (req: Request, res: Response) => {
   }
 });
 
-/**
- * GET /analytics/:clientId?range=10d|15d|30d — historical analytics.
- *
- * Returns a summary (total, allowed, denied, avg response time) plus a
- * zero-filled daily trend array for charting. Results are cached in
- * Redis for 30 seconds to avoid repeated expensive Postgres aggregation
- * queries (generate_series + LEFT JOIN + GROUP BY).
- */
+// ---------------------------------------------------------------------------
+// GET /analytics/:clientId?range=10d|15d|30d — historical analytics
+// ---------------------------------------------------------------------------
+
 app.get("/analytics/:clientId", async (req: Request, res: Response) => {
   const clientId = req.params.clientId as string;
   const range = (req.query.range as string) || "10d";
@@ -161,23 +111,30 @@ app.get("/analytics/:clientId", async (req: Request, res: Response) => {
   }
 });
 
-/**
- * GET /requests/:clientId?limit=50 — recent request log for a client.
- *
- * Returns the most recent requests for the dashboard's real-time log.
- * Results are ordered by created_at DESC (newest first).
- * The limit parameter caps how many rows are returned (default 50, max 200).
- *
- * This endpoint is read-heavy but low-traffic (only the dashboard polls it),
- * so no caching is needed — freshness matters more than performance here.
- */
+// ---------------------------------------------------------------------------
+// GET /requests/:clientId — recent request log with optional filters
+//   ?status=allowed|denied  ?source=redis|local-fallback  ?maxLatency=N  ?limit=N
+// ---------------------------------------------------------------------------
+
 app.get("/requests/:clientId", async (req: Request, res: Response) => {
   const clientId = req.params.clientId as string;
   const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string, 10) || 50));
+  const status = typeof req.query.status === "string" ? req.query.status : undefined;
+  const source = typeof req.query.source === "string" ? req.query.source : undefined;
+  const maxLatency = typeof req.query.maxLatency === "string"
+    ? parseFloat(req.query.maxLatency)
+    : undefined;
+
+  const where: Record<string, unknown> = { clientId };
+  if (status === "allowed" || status === "denied") where.status = status;
+  if (source === "redis" || source === "local-fallback") where.source = source;
+  if (maxLatency !== undefined && !isNaN(maxLatency)) {
+    where.responseTimeMs = { lte: maxLatency };
+  }
 
   try {
     const requests = await prisma.request.findMany({
-      where: { clientId },
+      where,
       orderBy: { createdAt: "desc" },
       take: limit,
       select: {
@@ -204,52 +161,129 @@ app.get("/requests/:clientId", async (req: Request, res: Response) => {
   }
 });
 
-/**
- * GET /health — liveness probe for container orchestrators (Docker, K8s).
- * Returns 200 { "status": "ok" } if the process is alive.
- */
+// ---------------------------------------------------------------------------
+// Client config CRUD
+// ---------------------------------------------------------------------------
+
+app.get("/clients", async (_req: Request, res: Response) => {
+  try {
+    return res.status(200).json(await listClients());
+  } catch (err) {
+    console.error("[GET /clients] unexpected error:", err);
+    return res.status(500).json({ error: "internal error" });
+  }
+});
+
+app.get("/clients/:id", async (req: Request, res: Response) => {
+  try {
+    const client = await getClient(req.params.id as string);
+    if (!client) return res.status(404).json({ error: "client not found" });
+    return res.status(200).json(client);
+  } catch (err) {
+    console.error("[GET /clients/:id] unexpected error:", err);
+    return res.status(500).json({ error: "internal error" });
+  }
+});
+
+app.post("/clients", async (req: Request, res: Response) => {
+  const { id, limitPerMinute, displayName } = req.body;
+
+  if (!id || typeof id !== "string") {
+    return res.status(400).json({ error: "id is required (string)" });
+  }
+  if (typeof limitPerMinute !== "number" || limitPerMinute < 1) {
+    return res.status(400).json({ error: "limitPerMinute must be a positive number" });
+  }
+
+  try {
+    return res.status(200).json(await upsertClient({ id, limitPerMinute, displayName }));
+  } catch (err) {
+    console.error("[POST /clients] unexpected error:", err);
+    return res.status(500).json({ error: "internal error" });
+  }
+});
+
+app.put("/clients/:id", async (req: Request, res: Response) => {
+  const { limitPerMinute, displayName } = req.body;
+
+  if (typeof limitPerMinute !== "number" || limitPerMinute < 1) {
+    return res.status(400).json({ error: "limitPerMinute must be a positive number" });
+  }
+
+  try {
+    const existing = await getClient(req.params.id as string);
+    if (!existing) return res.status(404).json({ error: "client not found" });
+    const client = await upsertClient({
+      id: req.params.id as string,
+      limitPerMinute,
+      displayName: displayName ?? existing.displayName ?? undefined,
+    });
+    return res.status(200).json(client);
+  } catch (err) {
+    console.error("[PUT /clients/:id] unexpected error:", err);
+    return res.status(500).json({ error: "internal error" });
+  }
+});
+
+app.delete("/clients/:id", async (req: Request, res: Response) => {
+  try {
+    const deleted = await deleteClient(req.params.id as string);
+    if (!deleted) return res.status(404).json({ error: "client not found" });
+    return res.status(200).json({ deleted: true });
+  } catch (err) {
+    console.error("[DELETE /clients/:id] unexpected error:", err);
+    return res.status(500).json({ error: "internal error" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Health + startup + shutdown
+// ---------------------------------------------------------------------------
+
 app.get("/health", (_req: Request, res: Response) => {
   res.status(200).json({ status: "ok" });
 });
 
-// ---------------------------------------------------------------------------
-// Server startup + graceful shutdown
-// ---------------------------------------------------------------------------
-
 const PORT = process.env.PORT || 3000;
-
-// Wrap Express in http.createServer so we can call .close() during shutdown.
-// This ensures in-flight requests are drained before the process exits.
 const server = http.createServer(app);
 
-server.listen(PORT, () => {
-  console.log(`Rate limiter service listening on port ${PORT}`);
-});
+async function seedDefaults(): Promise<void> {
+  const defaults = [
+    { id: "client-a", limitPerMinute: 100, displayName: "Client A" },
+    { id: "client-b", limitPerMinute: 5000, displayName: "Client B" },
+  ];
+  for (const c of defaults) {
+    await prisma.clientConfig.upsert({
+      where: { id: c.id },
+      update: { limitPerMinute: c.limitPerMinute, displayName: c.displayName },
+      create: c,
+    });
+  }
+  console.log("[startup] seeded default client configurations");
+}
 
-/**
- * Graceful shutdown handler.
- *
- * When Docker sends SIGTERM (default 10s before SIGKILL), this handler:
- *   1. Stops accepting new connections (server.close)
- *   2. Waits for in-flight HTTP requests to finish
- *   3. Disconnects the Prisma connection pool (Postgres)
- *   4. Disconnects the Redis client
- *   5. Exits cleanly with code 0
- *
- * A 10-second safety timeout forces exit if something hangs — this
- * prevents Docker from sending SIGKILL, which doesn't allow any cleanup.
- */
+async function start() {
+  try {
+    await seedDefaults();
+    await refreshClientCache();
+    server.listen(PORT, () => {
+      console.log(`Rate limiter service listening on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error("[startup] failed:", err);
+    process.exit(1);
+  }
+}
+
+start();
+
 async function shutdown(signal: string) {
-  console.log(`\n[${signal}] received, shutting down gracefully...`);
+  console.log(`\n[${signal}] received, shutting down...`);
   server.close(async () => {
-    console.log("[shutdown] HTTP server closed");
     await prisma.$disconnect();
-    console.log("[shutdown] Prisma disconnected");
     redis.disconnect();
-    console.log("[shutdown] Redis disconnected");
     process.exit(0);
   });
-
   setTimeout(() => {
     console.error("[shutdown] forced exit after 10s timeout");
     process.exit(1);
