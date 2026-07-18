@@ -1,0 +1,78 @@
+.request-log {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.request-log__scroll {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.request-log__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.request-log__table th,
+.request-log__table td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.request-log__table th {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+}
+
+.request-log__time {
+  white-space: nowrap;
+  color: var(--ink-muted);
+}
+
+.request-log__mono {
+  font-family: var(--font-mono);
+}
+
+.request-log__muted {
+  color: var(--ink-faint);
+}
+
+.request-log__badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.request-log__badge--allowed {
+  background: var(--safe-soft);
+  color: var(--safe);
+}
+
+.request-log__badge--denied {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.request-log__empty {
+  padding: 24px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.request-log__empty--error {
+  color: var(--danger);
+}

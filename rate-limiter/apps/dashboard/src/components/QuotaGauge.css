@@ -1,0 +1,119 @@
+.quota-gauge {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 24px 28px 20px;
+}
+
+.quota-gauge__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.quota-gauge__eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.quota-gauge__status {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.quota-gauge__status--safe {
+  color: var(--safe);
+  background: var(--safe-soft);
+}
+.quota-gauge__status--warn {
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+.quota-gauge__status--danger {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.quota-gauge__track {
+  position: relative;
+  height: 22px;
+  background: var(--surface-sunken);
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.quota-gauge__fill {
+  position: absolute;
+  inset: 0;
+  width: 0%;
+  border-radius: 999px;
+  transition: width 400ms ease, background-color 400ms ease;
+}
+
+.quota-gauge__fill--safe {
+  background: linear-gradient(90deg, #2f9e6b, #3fb37d);
+}
+.quota-gauge__fill--warn {
+  background: linear-gradient(90deg, #d98e04, #e6a323);
+}
+.quota-gauge__fill--danger {
+  background: linear-gradient(90deg, #c4432b, #d65a41);
+}
+
+.quota-gauge__ticks {
+  position: absolute;
+  inset: 0;
+}
+
+.quota-gauge__tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.quota-gauge__readout {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.quota-gauge__count {
+  font-family: var(--font-mono);
+  font-size: 34px;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.quota-gauge__slash {
+  color: var(--ink-faint);
+  margin: 0 4px;
+}
+
+.quota-gauge__label {
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.quota-gauge__reset {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.quota-gauge__reset strong {
+  font-family: var(--font-mono);
+  color: var(--ink-muted);
+  font-weight: 500;
+}

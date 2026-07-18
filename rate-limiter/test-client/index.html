@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Rate Limiter — Test Client</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --surface: #ffffff;
+    --surface-sunken: #eef0f3;
+    --ink: #1b2430;
+    --ink-muted: #5b6472;
+    --ink-faint: #8b93a1;
+    --line: #e2e5ea;
+    --line-strong: #cbd1da;
+    --accent: #3a4f91;
+    --accent-soft: #e8ebf5;
+    --safe: #2f9e6b;
+    --safe-soft: #e4f5ed;
+    --warn: #d98e04;
+    --warn-soft: #fbf1dc;
+    --danger: #c4432b;
+    --danger-soft: #fbe9e5;
+    --font-display: "Space Grotesk", sans-serif;
+    --font-body: "IBM Plex Sans", sans-serif;
+    --font-mono: "IBM Plex Mono", monospace;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+  .app { max-width: 1040px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  header { margin-bottom: 28px; }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-size: 30px;
+    font-weight: 700;
+    margin: 2px 0 0;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+    margin-bottom: 18px;
+  }
+  .card h2 {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 14px;
+  }
+
+  .config-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 14px;
+  }
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--ink-muted);
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  input {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--ink);
+  }
+  select {
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 500;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  input:focus, select:focus, button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  button {
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 13px;
+    padding: 10px 18px;
+    border-radius: 999px;
+    border: none;
+    cursor: pointer;
+    background: var(--accent);
+    color: #fff;
+  }
+  button:hover { filter: brightness(1.08); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.secondary {
+    background: var(--surface-sunken);
+    color: var(--ink);
+    border: 1px solid var(--line-strong);
+  }
+  button.danger-btn { background: var(--danger); }
+
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  .test-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+  @media (max-width: 800px) {
+    .test-grid { grid-template-columns: 1fr; }
+    .config-grid { grid-template-columns: 1fr; }
+  }
+
+  .field-row { display: flex; gap: 12px; margin-bottom: 14px; }
+  .field-row label { flex: 1; }
+
+  .result-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    margin-top: 4px;
+  }
+  .result-badge.allowed { background: var(--safe-soft); color: var(--safe); }
+  .result-badge.denied { background: var(--danger-soft); color: var(--danger); }
+  .result-badge.pending { background: var(--surface-sunken); color: var(--ink-muted); }
+  .result-badge.error { background: var(--warn-soft); color: var(--warn); }
+
+  .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px; }
+  .stat {
+    background: var(--surface-sunken);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+  }
+  .stat .label { font-size: 11px; color: var(--ink-faint); font-family: var(--font-mono); text-transform: uppercase; }
+  .stat .value { font-family: var(--font-mono); font-size: 18px; font-weight: 500; margin-top: 2px; }
+  .stat.safe .value { color: var(--safe); }
+  .stat.danger .value { color: var(--danger); }
+
+  .bar-track {
+    display: flex;
+    height: 14px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--surface-sunken);
+    margin-top: 12px;
+    border: 1px solid var(--line);
+  }
+  .bar-allowed { background: var(--safe); height: 100%; }
+  .bar-denied { background: var(--danger); height: 100%; }
+
+  .sparkline {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 90px;
+    margin-top: 14px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 2px;
+    overflow-x: auto;
+  }
+  .spark-col {
+    display: flex;
+    flex-direction: column-reverse;
+    width: 10px;
+    min-width: 10px;
+    height: 100%;
+    border-radius: 2px 2px 0 0;
+    overflow: hidden;
+  }
+  .spark-allowed { background: var(--safe); width: 100%; }
+  .spark-denied { background: var(--danger); width: 100%; }
+
+  table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 12px; margin-top: 6px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--ink-faint); font-weight: 500; text-transform: uppercase; font-size: 10px; letter-spacing: 0.04em; }
+  .log-wrap { max-height: 260px; overflow-y: auto; margin-top: 10px; }
+  .tag { padding: 2px 8px; border-radius: 999px; font-size: 11px; }
+  .tag.allowed { background: var(--safe-soft); color: var(--safe); }
+  .tag.denied { background: var(--danger-soft); color: var(--danger); }
+  .tag.error { background: var(--warn-soft); color: var(--warn); }
+
+  .help {
+    font-size: 12px;
+    color: var(--ink-faint);
+    margin-top: 8px;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <span class="eyebrow">Rate Limiter</span>
+    <h1>Test Client</h1>
+  </header>
+
+  <div class="card">
+    <h2>Configuration</h2>
+    <div class="config-grid">
+      <label>API base URL
+        <input id="apiBase" value="http://localhost:3000" />
+      </label>
+      <label>Client
+        <select id="clientSelect">
+          <option value="client-a">client-a (100/min)</option>
+          <option value="client-b">client-b (5000/min)</option>
+          <option value="custom">Custom...</option>
+        </select>
+      </label>
+      <label id="customLabel" style="display:none;">Custom Client ID
+        <input id="clientId" value="test-client-1" />
+      </label>
+    </div>
+    <div class="help">
+      Select a configured client or choose "Custom" to enter any client ID.
+      Configured limits: <code>client-a</code> = 100/min,
+      <code>client-b</code> = 5000/min, unknown = 60/min default.
+    </div>
+  </div>
+
+  <div class="test-grid">
+    <div class="card">
+      <h2>Single request</h2>
+      <div class="row">
+        <button id="fireSingleBtn">Fire one request</button>
+        <button class="secondary" id="clearSingleBtn">Clear</button>
+      </div>
+      <div id="singleResult" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>Burst test</h2>
+      <div class="field-row">
+        <label>Concurrent requests
+          <input id="burstCount" type="number" value="150" min="1" max="5000" />
+        </label>
+      </div>
+      <div class="row">
+        <button id="fireBurstBtn">Fire burst</button>
+        <button class="secondary" id="clearBurstBtn">Clear</button>
+      </div>
+      <div id="burstResult"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Sustained test</h2>
+    <div class="field-row">
+      <label>Requests per second
+        <input id="sustainedRate" type="number" value="20" min="1" max="500" />
+      </label>
+      <label>Duration (seconds)
+        <input id="sustainedDuration" type="number" value="20" min="1" max="600" />
+      </label>
+    </div>
+    <div class="row">
+      <button id="fireSustainedBtn">Start sustained test</button>
+      <button class="danger-btn" id="stopSustainedBtn" disabled>Stop</button>
+      <button class="secondary" id="clearSustainedBtn">Clear</button>
+    </div>
+    <div class="help">
+      Fires requests at a steady rate over time — useful for watching the
+      quota window reset (allowed/denied should flip back and forth as each
+      minute rolls over) rather than just seeing one instantaneous burst.
+    </div>
+    <div id="sustainedStats"></div>
+    <div class="sparkline" id="sparkline"></div>
+  </div>
+
+  <div class="card">
+    <h2>Request log</h2>
+    <div class="row">
+      <button class="secondary" id="clearLogBtn">Clear log</button>
+      <span class="help" style="margin:0;">Most recent 200 requests, newest first.</span>
+    </div>
+    <div class="log-wrap">
+      <table>
+        <thead>
+          <tr><th>Time</th><th>Mode</th><th>Client</th><th>Result</th><th>Count/Limit</th><th>Latency</th><th>Source</th></tr>
+        </thead>
+        <tbody id="logBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  let log = []; // {time, mode, clientId, allowed, count, limit, latencyMs, source, error}
+  let sustainedTimer = null;
+  let sustainedBuckets = []; // per-second {allowed, denied}
+
+  function apiBase() { return $("apiBase").value.replace(/\/$/, ""); }
+  function clientId() {
+    const sel = $("clientSelect").value;
+    if (sel === "custom") return $("clientId").value.trim() || "test-client-1";
+    return sel;
+  }
+
+  $("clientSelect").addEventListener("change", () => {
+    $("customLabel").style.display = $("clientSelect").value === "custom" ? "" : "none";
+  });
+
+  async function fireCheck(cid) {
+    const start = performance.now();
+    try {
+      const res = await fetch(`${apiBase()}/check`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId: cid }),
+      });
+      const latencyMs = performance.now() - start;
+      const body = await res.json().catch(() => ({}));
+      return {
+        ok: true,
+        allowed: body.allowed === true,
+        count: body.count,
+        limit: body.limit,
+        source: body.source,
+        latencyMs,
+        status: res.status,
+      };
+    } catch (err) {
+      return { ok: false, error: err.message, latencyMs: performance.now() - start };
+    }
+  }
+
+  function addLogEntry(mode, cid, result) {
+    log.unshift({
+      time: new Date().toLocaleTimeString(),
+      mode,
+      clientId: cid,
+      ...result,
+    });
+    if (log.length > 200) log.pop();
+    renderLog();
+  }
+
+  function renderLog() {
+    const body = $("logBody");
+    body.innerHTML = log
+      .map((r) => {
+        const tag = !r.ok
+          ? `<span class="tag error">error</span>`
+          : r.allowed
+          ? `<span class="tag allowed">allowed</span>`
+          : `<span class="tag denied">denied</span>`;
+        const countLimit = r.ok && r.count != null ? `${r.count}/${r.limit}` : "—";
+        const latency = r.latencyMs != null ? `${r.latencyMs.toFixed(1)}ms` : "—";
+        return `<tr>
+          <td>${r.time}</td>
+          <td>${r.mode}</td>
+          <td>${r.clientId}</td>
+          <td>${tag}</td>
+          <td>${countLimit}</td>
+          <td>${latency}</td>
+          <td>${r.source || (r.ok ? "" : r.error)}</td>
+        </tr>`;
+      })
+      .join("");
+  }
+
+  // ---- Single request ----
+  $("fireSingleBtn").addEventListener("click", async () => {
+    $("fireSingleBtn").disabled = true;
+    $("singleResult").innerHTML = `<span class="result-badge pending">sending…</span>`;
+    const cid = clientId();
+    const r = await fireCheck(cid);
+    addLogEntry("single", cid, r);
+
+    if (!r.ok) {
+      $("singleResult").innerHTML = `<span class="result-badge error">error: ${r.error}</span>`;
+    } else {
+      const cls = r.allowed ? "allowed" : "denied";
+      $("singleResult").innerHTML = `
+        <span class="result-badge ${cls}">
+          ${r.allowed ? "ALLOWED" : "DENIED (429)"} · ${r.count}/${r.limit} · ${r.latencyMs.toFixed(1)}ms · source: ${r.source}
+        </span>`;
+    }
+    $("fireSingleBtn").disabled = false;
+  });
+  $("clearSingleBtn").addEventListener("click", () => { $("singleResult").innerHTML = ""; });
+
+  // ---- Burst test ----
+  $("fireBurstBtn").addEventListener("click", async () => {
+    const cid = clientId();
+    const n = Math.max(1, parseInt($("burstCount").value, 10) || 1);
+    $("fireBurstBtn").disabled = true;
+    $("burstResult").innerHTML = `<div class="help">firing ${n} concurrent requests…</div>`;
+
+    const results = await Promise.all(Array.from({ length: n }, () => fireCheck(cid)));
+    results.forEach((r) => addLogEntry("burst", cid, r));
+
+    const ok = results.filter((r) => r.ok);
+    const allowed = ok.filter((r) => r.allowed).length;
+    const denied = ok.filter((r) => !r.allowed).length;
+    const errors = results.length - ok.length;
+    const latencies = ok.map((r) => r.latencyMs).sort((a, b) => a - b);
+    const p50 = latencies[Math.floor(latencies.length * 0.5)] || 0;
+    const p99 = latencies[Math.floor(latencies.length * 0.99)] || 0;
+    const allowedPct = ok.length ? (allowed / ok.length) * 100 : 0;
+
+    $("burstResult").innerHTML = `
+      <div class="stat-row">
+        <div class="stat safe"><div class="label">Allowed</div><div class="value">${allowed}</div></div>
+        <div class="stat danger"><div class="label">Denied</div><div class="value">${denied}</div></div>
+        <div class="stat"><div class="label">p50 latency</div><div class="value">${p50.toFixed(1)}ms</div></div>
+        <div class="stat"><div class="label">p99 latency</div><div class="value">${p99.toFixed(1)}ms</div></div>
+      </div>
+      <div class="bar-track">
+        <div class="bar-allowed" style="width:${allowedPct}%"></div>
+        <div class="bar-denied" style="width:${100 - allowedPct}%"></div>
+      </div>
+      ${errors > 0 ? `<div class="help">${errors} request(s) failed to complete — check the API base URL and that the server is reachable (CORS enabled).</div>` : ""}
+    `;
+    $("fireBurstBtn").disabled = false;
+  });
+  $("clearBurstBtn").addEventListener("click", () => { $("burstResult").innerHTML = ""; });
+
+  // ---- Sustained test ----
+  function renderSparkline() {
+    const el = $("sparkline");
+    el.innerHTML = sustainedBuckets
+      .map((b) => {
+        const total = b.allowed + b.denied || 1;
+        const allowedH = Math.round((b.allowed / total) * 100);
+        return `<div class="spark-col" title="${b.allowed} allowed / ${b.denied} denied">
+          <div class="spark-denied" style="height:${100 - allowedH}%"></div>
+          <div class="spark-allowed" style="height:${allowedH}%"></div>
+        </div>`;
+      })
+      .join("");
+    el.scrollLeft = el.scrollWidth;
+  }
+
+  function renderSustainedStats(totalAllowed, totalDenied, totalErrors) {
+    $("sustainedStats").innerHTML = `
+      <div class="stat-row">
+        <div class="stat safe"><div class="label">Allowed</div><div class="value">${totalAllowed}</div></div>
+        <div class="stat danger"><div class="label">Denied</div><div class="value">${totalDenied}</div></div>
+        <div class="stat"><div class="label">Errors</div><div class="value">${totalErrors}</div></div>
+        <div class="stat"><div class="label">Elapsed</div><div class="value">${sustainedBuckets.length}s</div></div>
+      </div>`;
+  }
+
+  $("fireSustainedBtn").addEventListener("click", () => {
+    const cid = clientId();
+    const rate = Math.max(1, parseInt($("sustainedRate").value, 10) || 1);
+    const durationSec = Math.max(1, parseInt($("sustainedDuration").value, 10) || 1);
+    const intervalMs = 1000 / rate;
+
+    sustainedBuckets = [];
+    let totalAllowed = 0, totalDenied = 0, totalErrors = 0;
+    let elapsedSec = 0;
+    let currentBucket = { allowed: 0, denied: 0 };
+    sustainedBuckets.push(currentBucket);
+
+    $("fireSustainedBtn").disabled = true;
+    $("stopSustainedBtn").disabled = false;
+
+    const tickBucket = setInterval(() => {
+      elapsedSec++;
+      currentBucket = { allowed: 0, denied: 0 };
+      sustainedBuckets.push(currentBucket);
+      renderSparkline();
+      if (elapsedSec >= durationSec) stopSustained();
+    }, 1000);
+
+    const fireLoop = setInterval(async () => {
+      const r = await fireCheck(cid);
+      addLogEntry("sustained", cid, r);
+      if (!r.ok) { totalErrors++; }
+      else if (r.allowed) { totalAllowed++; currentBucket.allowed++; }
+      else { totalDenied++; currentBucket.denied++; }
+      renderSustainedStats(totalAllowed, totalDenied, totalErrors);
+      renderSparkline();
+    }, intervalMs);
+
+    function stopSustained() {
+      clearInterval(tickBucket);
+      clearInterval(fireLoop);
+      sustainedTimer = null;
+      $("fireSustainedBtn").disabled = false;
+      $("stopSustainedBtn").disabled = true;
+    }
+
+    sustainedTimer = stopSustained;
+  });
+
+  $("stopSustainedBtn").addEventListener("click", () => {
+    if (sustainedTimer) sustainedTimer();
+  });
+
+  $("clearSustainedBtn").addEventListener("click", () => {
+    sustainedBuckets = [];
+    renderSparkline();
+    $("sustainedStats").innerHTML = "";
+  });
+
+  $("clearLogBtn").addEventListener("click", () => { log = []; renderLog(); });
+</script>
+</body>
+</html>

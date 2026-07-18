@@ -1,0 +1,20 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Request {
+  id              BigInt   @id @default(autoincrement()) @db.BigInt
+  clientId        String   @map("client_id")
+  status          String
+  responseTimeMs  Decimal  @map("response_time_ms") @db.Decimal(8, 2)
+  source          String
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@index([clientId, createdAt(sort: Desc)], map: "idx_requests_client_created")
+  @@index([clientId, status, createdAt(sort: Desc)], map: "idx_requests_client_status_created")
+  @@map("requests")
+}
