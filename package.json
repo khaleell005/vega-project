@@ -1,0 +1,25 @@
+{
+  "name": "rate-limiter-monorepo",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --parallel -r run dev",
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test",
+    "typecheck": "pnpm -r run typecheck",
+    "start": "pnpm --filter @rate-limiter/api run start",
+    "migrate": "pnpm --filter @rate-limiter/api run migrate",
+    "loadtest": "pnpm --filter @rate-limiter/api run loadtest"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/engines",
+      "prisma",
+      "@swc/core",
+      "esbuild"
+    ]
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  }
+}

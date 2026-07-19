@@ -1,7 +1,7 @@
 {
-  "name": "rate-limiter-dashboard",
-  "private": true,
+  "name": "@rate-limiter/dashboard",
   "version": "1.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",

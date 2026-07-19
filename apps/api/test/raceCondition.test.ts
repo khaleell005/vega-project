@@ -10,7 +10,7 @@
 import fs from "fs";
 import path from "path";
 import redis from "../src/lib/redis";
-import { DEFAULT_LIMIT_PER_MINUTE } from "../src/config/clientConfig";
+import { DEFAULT_LIMIT_PER_MINUTE } from "../src/config/defaults";
 
 const luaScript = fs.readFileSync(
   path.join(__dirname, "..", "src", "lua", "rateLimit.lua"),

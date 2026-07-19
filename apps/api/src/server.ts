@@ -10,7 +10,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import express, { Request, Response } from "express";
+import express, { Request, Response, Express } from "express";
 import http from "http";
 import { checkLimit, getCurrentUsage } from "./services/rateLimiter";
 import { logRequest } from "./services/requestLogger";
@@ -25,7 +25,7 @@ import {
 import prisma from "./lib/prisma";
 import redis from "./lib/redis";
 
-const app = express();
+const app: Express = express();
 app.use(express.json());
 
 // CORS — tighten origin in production.

@@ -1,29 +1,30 @@
-# Dockerfile — dashboard (React + Vite)
+# Dockerfile — Dashboard (React + Vite, pnpm monorepo)
 #
-# Multi-stage: the build stage compiles the Vite app (needs Node +
-# devDependencies), the final stage only needs nginx to serve the
-# static output. Keeps the shipped image small and free of any
-# Node/npm tooling.
+# Multi-stage: build stage compiles Vite, final stage serves static via nginx.
 
 FROM node:20-alpine AS build
+
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm ci
+# Copy workspace config.
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 
-COPY . .
+# Copy only package.json files.
+COPY apps/dashboard/package.json ./apps/dashboard/
 
-# The dashboard is a client-side app -- this env var gets baked into
-# the built JS bundle at build time (Vite's import.meta.env behavior),
-# so it must point at wherever the API will be reachable FROM THE
-# BROWSER, not from inside the Docker network. Defaults to the
-# backend's host-published port, which is what docker-compose.yml
-# passes in.
+# Install all deps (workspace-aware, includes devDependencies for Vite build).
+RUN pnpm install --frozen-lockfile --filter @rate-limiter/dashboard...
+
+# Copy dashboard source.
+COPY apps/dashboard/ ./apps/dashboard/
+
 ARG VITE_API_BASE=http://localhost:3000
 ENV VITE_API_BASE=$VITE_API_BASE
 
-RUN npm run build
+RUN cd apps/dashboard && pnpm run build
 
 FROM nginx:alpine
-COPY --from=build /app/dist /usr/share/nginx/html
+COPY --from=build /app/apps/dashboard/dist /usr/share/nginx/html
 EXPOSE 80

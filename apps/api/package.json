@@ -1,7 +1,7 @@
 {
-  "name": "global-rate-limiter",
+  "name": "@rate-limiter/api",
   "version": "1.0.0",
-  "description": "Global Rate Limiter as a Service - Phases 1-5 (core limiter, Postgres logging, analytics, dashboard, tests)",
+  "private": true,
   "main": "src/server.ts",
   "type": "commonjs",
   "scripts": {

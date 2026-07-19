@@ -10,8 +10,9 @@
 
 import prisma from "../lib/prisma";
 import { cacheGet, cacheSet, cacheInvalidate } from "../lib/cache";
+import { DEFAULT_LIMIT_PER_MINUTE } from "./defaults";
 
-export const DEFAULT_LIMIT_PER_MINUTE = 60;
+export { DEFAULT_LIMIT_PER_MINUTE } from "./defaults";
 
 const MEMORY_CACHE_TTL_MS = 60_000;
 const REDIS_CACHE_TTL = 120;
