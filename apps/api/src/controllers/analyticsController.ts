@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { getClientAnalytics, isValidRange, ALLOWED_RANGES } from "../services/analytics";
+import { getClientAnalytics, isValidRange } from "../services/analytics";
 
 const router: ReturnType<typeof Router> = Router();
 
@@ -9,7 +9,7 @@ router.get("/analytics/:clientId", async (req: Request, res: Response) => {
 
   if (!isValidRange(range)) {
     return res.status(400).json({
-      error: `invalid range "${range}" -- must be one of ${Object.keys(ALLOWED_RANGES).join(", ")}`,
+      error: `invalid range "${range}" -- must be one of: 10d, 15d, 30d`,
     });
   }
 

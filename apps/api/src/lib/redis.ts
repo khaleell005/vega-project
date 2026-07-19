@@ -5,9 +5,6 @@
  * retryStrategy: linear backoff capped at 2s for quick reconnection.
  */
 
-import dotenv from "dotenv";
-dotenv.config();
-
 import Redis from "ioredis";
 
 const redis = new Redis({

@@ -20,7 +20,7 @@ export interface LimitResult {
   allowed: boolean;
   count: number;
   limit: number;
-  source: string; // "redis" or "local-fallback"
+  source: "redis" | "local-fallback";
 }
 
 export interface UsageResult {

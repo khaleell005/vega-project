@@ -2,9 +2,6 @@
  * prisma.ts — Prisma client singleton using @prisma/adapter-pg driver adapter.
  */
 
-import dotenv from "dotenv";
-dotenv.config();
-
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 

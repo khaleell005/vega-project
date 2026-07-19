@@ -50,17 +50,16 @@ export async function getClientAnalytics(
   const days = ALLOWED_RANGES[range];
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-  const [summary, allowed, denied] = await Promise.all([
-    prisma.request.aggregate({
-      where: { clientId, createdAt: { gte: since } },
-      _count: { id: true },
-      _avg: { responseTimeMs: true },
-    }),
+  const [allowed, denied, avgResult] = await Promise.all([
     prisma.request.count({
       where: { clientId, status: "allowed", createdAt: { gte: since } },
     }),
     prisma.request.count({
       where: { clientId, status: "denied", createdAt: { gte: since } },
+    }),
+    prisma.request.aggregate({
+      where: { clientId, createdAt: { gte: since } },
+      _avg: { responseTimeMs: true },
     }),
   ]);
 
@@ -92,11 +91,11 @@ export async function getClientAnalytics(
   const result: AnalyticsResult = {
     clientId,
     range,
-    totalRequests: Number(summary._count.id),
+    totalRequests: allowed + denied,
     allowedRequests: allowed,
     deniedRequests: denied,
     avgResponseTimeMs: Number(
-      parseFloat(String(summary._avg.responseTimeMs || 0)).toFixed(2)
+      parseFloat(String(avgResult._avg.responseTimeMs || 0)).toFixed(2)
     ),
     trend: trendRaw.map((row) => ({
       date: row.date instanceof Date

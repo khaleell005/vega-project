@@ -85,7 +85,7 @@ export async function listClients(): Promise<ClientConfigOutput[]> {
   if (cached) return cached;
 
   const rows = await prisma.clientConfig.findMany({ orderBy: { id: "asc" } });
-  const result = rows.map((r: { id: string; limitPerMinute: number; displayName: string | null; createdAt: Date; updatedAt: Date }) => ({
+  const result = rows.map((r) => ({
     id: r.id,
     limitPerMinute: r.limitPerMinute,
     displayName: r.displayName,
