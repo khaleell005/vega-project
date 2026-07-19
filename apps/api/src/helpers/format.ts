@@ -19,7 +19,7 @@ export function serializeRequest(row: {
     status: row.status,
     responseTimeMs: typeof row.responseTimeMs === "number"
       ? row.responseTimeMs
-      : Number(row.responseTimeMs),
+      : row.responseTimeMs.toNumber(),
     source: row.source,
     createdAt: row.createdAt instanceof Date
       ? row.createdAt.toISOString()
