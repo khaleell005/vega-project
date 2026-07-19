@@ -1,13 +1,6 @@
-/**
- * analytics.ts — Historical analytics with Redis caching.
- *
- * getClientAnalytics(clientId, range) queries Postgres for summary stats
- * and a zero-filled daily trend with allowed/denied breakdown.
- * Results cached 30s. Cache invalidated on each logged request.
- */
-
 import prisma from "../lib/prisma";
-import { cacheGet, cacheSet } from "../lib/cache";
+import { cacheOrFetch } from "../helpers/cache";
+import { toDateString, toFixed } from "../helpers/format";
 
 export const ALLOWED_RANGES: Record<string, number> = {
   "10d": 10,
@@ -43,10 +36,14 @@ export async function getClientAnalytics(
   clientId: string,
   range: string
 ): Promise<AnalyticsResult> {
-  const cacheKey = `cache:analytics:${clientId}:${range}`;
-  const cached = await cacheGet<AnalyticsResult>(cacheKey);
-  if (cached) return cached;
+  return cacheOrFetch(
+    `cache:analytics:${clientId}:${range}`,
+    ANALYTICS_CACHE_TTL,
+    () => fetchAnalytics(clientId, range)
+  );
+}
 
+async function fetchAnalytics(clientId: string, range: string): Promise<AnalyticsResult> {
   const days = ALLOWED_RANGES[range];
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
@@ -63,7 +60,6 @@ export async function getClientAnalytics(
     }),
   ]);
 
-  // Zero-filled daily trend with allowed/denied split via generate_series + LEFT JOIN.
   const trendRaw = await prisma.$queryRaw<
     {
       date: Date;
@@ -88,28 +84,19 @@ export async function getClientAnalytics(
     ORDER BY day ASC
   `;
 
-  const result: AnalyticsResult = {
+  return {
     clientId,
     range,
     totalRequests: allowed + denied,
     allowedRequests: allowed,
     deniedRequests: denied,
-    avgResponseTimeMs: Number(
-      parseFloat(String(avgResult._avg.responseTimeMs || 0)).toFixed(2)
-    ),
+    avgResponseTimeMs: toFixed(avgResult._avg.responseTimeMs),
     trend: trendRaw.map((row) => ({
-      date: row.date instanceof Date
-        ? row.date.toISOString().split("T")[0]
-        : String(row.date).split("T")[0],
+      date: toDateString(row.date),
       requestCount: Number(row.request_count),
       allowedCount: Number(row.allowed_count),
       deniedCount: Number(row.denied_count),
-      avgResponseTimeMs: Number(
-        parseFloat(String(row.avg_response_time_ms)).toFixed(2)
-      ),
+      avgResponseTimeMs: toFixed(row.avg_response_time_ms),
     })),
   };
-
-  await cacheSet(cacheKey, result, ANALYTICS_CACHE_TTL);
-  return result;
 }
